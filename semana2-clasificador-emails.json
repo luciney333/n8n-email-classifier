@@ -1,0 +1,344 @@
+{
+  "name": "semana2-clasificador-emails",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of items) {\n  const texto = item.json.content[0].text;\n\n  let clasificacion;\n  try {\n    clasificacion = JSON.parse(texto);\n  } catch (e) {\n    clasificacion = {\n      categoria: 'error',\n      urgencia: 'baja',\n      resumen: 'Claude no devolvió JSON válido',\n      accion_recomendada: 'Revisar manualmente'\n    };\n  }\n\n  item.json = {\n    email: {\n      asunto:    $('Mensaje a JSON').first().json.asunto,\n      remitente: $('Mensaje a JSON').first().json.remitente,\n    },\n    clasificacion: clasificacion,\n    timestamp: new Date().toISOString(),\n  };\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        -32
+      ],
+      "id": "307a5046-f40e-456d-91df-efa860466850",
+      "name": "Parsear Respuesta"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of items) {\n  item.json = {\n    ok: false,\n    error: item.json.error || 'Error desconocido',\n    timestamp: new Date().toISOString(),\n  };\n}\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        -240
+      ],
+      "id": "bbf630de-34a2-4307-a914-a83a96fa6a7b",
+      "name": "Mensaje de error"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        -240
+      ],
+      "id": "6ed6f4ec-3d09-4efd-bb44-b889a2600e59",
+      "name": "Error Respond"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "clasificar-email",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -384,
+        -32
+      ],
+      "id": "db79ad1e-f53f-494c-a0b2-3e7ed47f3d73",
+      "name": "Entrada",
+      "webhookId": "4c0ee8e7-4c7f-493d-86ba-f25055603641"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of items) {\n  const { asunto, cuerpo, remitente } = item.json.body;\n\n  if (!asunto?.trim() || !cuerpo?.trim()) {\n    throw new Error('asunto y cuerpo son obligatorios');\n  }\n\n  item.json = {\n    asunto:    asunto.trim(),\n    cuerpo:    cuerpo.trim(),\n    remitente: remitente?.trim() || 'desconocido',\n    timestamp: new Date().toISOString(),\n  };\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -176,
+        -32
+      ],
+      "id": "85c792f4-10f3-4370-87c2-63b8e455cc74",
+      "name": "Mensaje a JSON",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6a418765-887c-49d6-8556-b60aa59c0cf0",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        32,
+        -32
+      ],
+      "id": "a4cba3c4-ad1a-4803-bff9-54f4372278ae",
+      "name": "Control errores",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "claude-haiku-4-5-20251001"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Clasifica este email en una de estas categorías: soporte, ventas, spam, facturación, otro.\n\nResponde ÚNICAMENTE con un objeto JSON válido, sin markdown, sin backticks, empezando por { y terminando por }.\n\nSchema exacto:\n{\n  \"categoria\": \"soporte | ventas | spam | facturación | otro\",\n  \"urgencia\": \"alta | media | baja\",\n  \"resumen\": \"una frase corta del problema\",\n  \"accion_recomendada\": \"qué debería hacer el equipo\"\n}\n\nEmail a clasificar:\nAsunto: {{ $('Mensaje a JSON').item.json.asunto }}\nCuerpo: {{ $('Mensaje a JSON').item.json.cuerpo }}\nRemitente: {{ $('Mensaje a JSON').item.json.remitente }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        240,
+        -16
+      ],
+      "id": "77f66978-df3a-4edc-8693-2e4fdd087728",
+      "name": "Claude",
+      "credentials": {
+        "anthropicApi": {
+          "id": "mtX3NesmoKWOrmbr",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        928,
+        -32
+      ],
+      "id": "e9631ee9-6dae-4b7d-ad6f-98fb97914c2b",
+      "name": "Salida"
+    },
+    {
+      "parameters": {
+        "tableId": "execution_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "workflow",
+              "fieldValue": "clasificador-emails"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "error"
+            },
+            {
+              "fieldId": "error",
+              "fieldValue": "={{ $('Mensaje de error').first().json.error }}"
+            },
+            {
+              "fieldId": "timestamp",
+              "fieldValue": "=={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        464,
+        -240
+      ],
+      "id": "08471bdf-4908-40ec-b7e3-73a3657c5862",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "8AZEsjqPrNiZUMC8",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "execution_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "workflow",
+              "fieldValue": "clasificador-emails"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "success"
+            },
+            {
+              "fieldId": "input",
+              "fieldValue": "=={{ JSON.stringify({ asunto: $('Mensaje a JSON').first().json.asunto, remitente: $('Mensaje a JSON').first().json.remitente }) }}"
+            },
+            {
+              "fieldId": "output",
+              "fieldValue": "=={{ JSON.stringify($('Parsear Respuesta').first().json.clasificacion) }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        736,
+        -32
+      ],
+      "id": "925d1431-a3e3-4ffd-9af3-310003837e7b",
+      "name": "Logs Status",
+      "credentials": {
+        "supabaseApi": {
+          "id": "8AZEsjqPrNiZUMC8",
+          "name": "Supabase account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Parsear Respuesta": {
+      "main": [
+        [
+          {
+            "node": "Logs Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensaje de error": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entrada": {
+      "main": [
+        [
+          {
+            "node": "Mensaje a JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensaje a JSON": {
+      "main": [
+        [
+          {
+            "node": "Control errores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Control errores": {
+      "main": [
+        [
+          {
+            "node": "Mensaje de error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude": {
+      "main": [
+        [
+          {
+            "node": "Parsear Respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row": {
+      "main": [
+        [
+          {
+            "node": "Error Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Logs Status": {
+      "main": [
+        [
+          {
+            "node": "Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "0a6be449-b24f-4ec2-a38d-f418922b3efd",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c002436fafbde0371514a7f02328909ad8f0208db57001e38907991eaa1f533a"
+  },
+  "nodeGroups": [],
+  "id": "kxaJSC300nHflyAT",
+  "tags": []
+}
